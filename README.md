@@ -1,51 +1,48 @@
 # plantgraph-database
 
-A Claude Code skill for querying [PlantGraph](https://plantgraph.se) (plantgraph.se) — a Neo4j knowledge graph and REST API platform for plant gene annotations, interactions, co-expression, orthologues, GO terms, pathways, protein structures, and enrichment data.
+Claude Code skill for [PlantGraph](https://plantgraph.se) — Neo4j knowledge graph + REST API for plant gene annotations, interactions, co-expression, orthologues, GO terms, pathways, protein structures, and enrichment.
 
-PlantGraph contains 14.5M+ nodes and 47.9M+ relationships across 127 plant species, with 132 node types and 149 relationship types. Integrates 140+ data sources with 42 real-time enrichment services. Built and maintained at UPSC (Umeå Plant Science Centre).
+14.5M+ nodes, 47.9M+ relationships, 127 species, 132 node types, 149 relationship types. 140+ data sources, 42 real-time enrichment services. Built at UPSC (Umeå Plant Science Centre).
 
-## What's in the graph
+## Graph contents
 
 - Gene annotations (GO, PO, protein domains, MapMan bins, pathways)
-- Protein-protein interactions and co-expression networks
+- Protein-protein interactions, co-expression networks
 - Cross-species orthologues and paralogues
-- Transcription factor binding (including DAP-seq validated)
+- TF binding (DAP-seq validated)
 - GWAS trait associations
-- Histone marks and other epigenetic data
+- Histone marks, epigenetic data
 - Single-cell expression profiles
-- Nutrient and pathogen response data
-- Publications and literature links
+- Nutrient/pathogen response data
+- 290K+ publications
 
-## Species coverage
+## Species
 
-Major species: Arabidopsis thaliana, Brassica napus, Triticum aestivum, Oryza sativa (japonica + indica), Brachypodium distachyon, Zea mays, Populus trichocarpa, and 120+ more.
+Arabidopsis thaliana, Brassica napus, Triticum aestivum, Oryza sativa (japonica + indica), Brachypodium distachyon, Zea mays, Populus trichocarpa, and 120+ more.
 
-Not in graph: Hordeum vulgare, Brachypodium sylvaticum. The skill documents orthologue chain strategies for these.
+Not in graph: Hordeum vulgare, Brachypodium sylvaticum — orthologue chain strategies documented.
 
-## Installation
-
-Copy `SKILL.md` to your Claude Code skills directory:
+## Install
 
 ```bash
 mkdir -p ~/.claude/skills/plantgraph-database
 cp SKILL.md ~/.claude/skills/plantgraph-database/SKILL.md
 ```
 
-## Usage
+## What the skill covers
 
-In Claude Code, invoke with `/plantgraph-database` when you need to query plant gene data. The skill provides:
+Invoke `/plantgraph-database` in Claude Code. Provides:
 
-- JWT authentication setup and rate limits
-- Complete REST API reference (Graph, Enrichment, AI, Paper Evidence endpoints)
-- 42 real-time enrichment sources (UniProt, STRING, AlphaFold, KEGG, etc.)
-- AI features: question generation, hypothesis generation, GNN predictions, chat
-- Paper evidence verification (abstract/PDF scoring, claim verification via SSE)
-- ID format rules per species (Arabidopsis uses `l.name`, others use `l.id`)
-- Phytozome-to-PlantGraph ID conversion tables
-- Ready-to-use Cypher query patterns for common tasks
-- Full schema reference: 132 node labels, 149 relationship types with counts
-- R and Python integration code with auth
-- Common mistakes and how to avoid them
+- JWT auth setup and rate limits
+- REST API reference: Graph, Enrichment, AI, Paper Evidence endpoints
+- 42 enrichment sources (UniProt, STRING, AlphaFold, KEGG, InterPro, Expression Atlas, ...)
+- AI: question generation, hypothesis generation, GNN predictions, chat
+- Paper evidence: abstract/PDF scoring, claim verification (SSE)
+- ID format rules per species (Arabidopsis `l.name`, others `l.id`)
+- Phytozome-to-PlantGraph ID conversion
+- Cypher query patterns for common tasks
+- Full schema: 132 node labels, 149 relationship types with counts
+- R and Python integration with auth
 
 ## License
 
