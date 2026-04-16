@@ -503,10 +503,7 @@ curl -s https://plantgraph.se/api/enrichment/gene/AT2G40150/uniprot \
 curl -s -X POST https://plantgraph.se/api/enrichment/batch \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "gene_ids": ["AT2G40150", "AT1G01430", "AT5G06700"],
-    "sources": ["uniprot", "string", "go"]
-  }'
+  -d '{"genes":["AT2G40150","AT1G01430","AT5G06700"],"sources":["uniprot","string"],"parallel":true}'
 # Returns: enrichment results per gene per source
 ```
 
@@ -515,12 +512,7 @@ curl -s -X POST https://plantgraph.se/api/enrichment/batch \
 curl -s -X POST https://plantgraph.se/api/enrichment/analysis/go \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "gene_ids": ["AT2G40150", "AT1G01430", "AT5G06700", "AT3G20810"],
-    "categories": ["biological_process", "molecular_function", "cellular_component"],
-    "p_threshold": 0.05,
-    "correction": "benjamini_hochberg"
-  }'
+  -d '{"genes":["AT2G40150","AT1G01430","AT5G06700","AT3G20810"],"background":"genome","ontology":"BP","correction":"fdr"}'
 # Returns: enriched GO terms with p-values, fold enrichment, gene counts
 ```
 
@@ -529,11 +521,7 @@ curl -s -X POST https://plantgraph.se/api/enrichment/analysis/go \
 curl -s -X POST https://plantgraph.se/api/enrichment/analysis/pathway \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "gene_ids": ["AT2G40150", "AT1G01430", "AT5G06700"],
-    "sources": ["kegg", "reactome", "plantcyc"],
-    "p_threshold": 0.05
-  }'
+  -d '{"genes":["AT2G40150","AT1G01430","AT5G06700"],"databases":["kegg","reactome"],"p_threshold":0.05}'
 # Returns: enriched pathways with p-values, gene overlap
 ```
 
@@ -946,7 +934,7 @@ ORDER BY score DESC LIMIT 15
 
 ### Key Indexes
 
-Composite indexes exist on `Locus(name)`, `Locus(id)`, `Locus(symbol)`, `Locus(species)`, `GO(id)`, `Publication(pmid)`, `SNP(id)`, `UniProt(id)`. Property lookups using these fields are fast; avoid `WHERE l.description CONTAINS` on large result sets (use fulltext index instead).
+Fast lookups exist for: `Locus.id` (unique constraint), `Locus.name`, `Locus.species`, `Locus.symbol`, `Locus.is_tf`, `Locus.tf_family`, `Locus.taxon_id`, `Locus.entrez_id`, `Locus.ncbi_gene_id`, `Locus.chromosome+start+end` (composite). Relationship indexes: `COEXPRESSES_WITH.correlation_score`, `EXPRESSED_UNDER_STRESS.log2fc`, `INTERACTS_WITH.source`, `DAPSEQ_BINDS_PROMOTER.source`.
 
 ### Additional Query Patterns
 
@@ -998,14 +986,17 @@ RETURN ct.name LIMIT 10
 
 **Spatial expression:**
 ```cypher
-MATCH (l:Locus {name: "AT2G40150"})-[:EXPRESSED_IN_SPATIAL_REGION]->(sr:SpatialRegion)
-RETURN sr.name, sr.tissue LIMIT 10
+MATCH (l:Locus {name: "AT2G40150"})-[:EXPRESSED_IN_REGION]->(sr:SpatialRegion)
+RETURN sr.name LIMIT 10
 ```
 
 **Methylation context:**
 ```cypher
-MATCH (l:Locus {name: "AT3G20810"})-[:HAS_METHYLATION]->(m:MethylationContext)
-RETURN m.context, m.level LIMIT 10
+MATCH (l:Locus {name: "AT3G20810"})-[:HAS_METHYLATION]->(m)
+RETURN m.id LIMIT 10
+-- Methylation context:
+MATCH (l:Locus {name: "AT3G20810"})-[:METHYLATED_IN_CONTEXT]->(mc:MethylationContext)
+RETURN mc.id LIMIT 10
 ```
 
 **All-annotations dump:**
@@ -1024,18 +1015,18 @@ LIMIT 50
 
 | Species | Loci | Species | Loci |
 |---|---|---|---|
-| Brassica napus | 149K | Sorghum bicolor | 16K |
-| Triticum aestivum | 108K | Setaria italica | 16K |
-| Brassica oleracea | 80K | Brachypodium distachyon | 15K |
-| Glycine max | 61K | Solanum lycopersicum | 14K |
-| Arabidopsis thaliana | 44K | Medicago truncatula | 13K |
-| Vitis vinifera | 37K | Oryza sativa | 13K |
-| Populus trichocarpa | 35K | Phaseolus vulgaris | 12K |
-| Zea mays | 30K | Cucumis sativus | 11K |
-| Oryza sativa subsp. japonica | 22K | Gossypium raimondii | 10K |
-| Solanum tuberosum | 18K | Prunus persica | 9K |
+| Brassica napus | 149K | Salix purpurea | 35K |
+| Triticum aestivum | 108K | Populus trichocarpa | 35K |
+| Brassica oleracea | 80K | Solanum pennellii | 34K |
+| Glycine max | 61K | Medicago truncatula | 33K |
+| Pinus taeda | 52K | Quercus lobata | 33K |
+| Arabidopsis lyrata | 52K | Solanum lycopersicum | 32K |
+| Arabidopsis thaliana | 44K | Zea mays | 30K |
+| Phaseolus vulgaris | 42K | Oryza sativa subsp. japonica | 22K |
+| Juglans regia | 40K | Sorghum bicolor | 16K |
+| Brassica rapa | 39K | Brachypodium distachyon | 15K |
 
-Additional species include Capsella rubella, Camelina sativa, Linum usitatissimum, Manihot esculenta, Theobroma cacao, Citrus sinensis, Eucalyptus grandis, Fragaria vesca, Aquilegia coerulea, Amborella trichopoda, Selaginella moellendorffii, Physcomitrella patens, Chlamydomonas reinhardtii, and 80+ more.
+Also includes: 9 additional Oryza species, conifers (Picea abies), mosses (Physcomitrium patens), ferns (Selaginella moellendorffii), algae (Galdieria sulphuraria, Chara braunii), liverworts (Marchantia polymorpha), hornworts (Anthoceros angustus).
 
 **Not in graph:** Hordeum vulgare, Brachypodium sylvaticum. For these species, use orthologue chains via Brachypodium distachyon or Arabidopsis.
 
@@ -1054,7 +1045,7 @@ Based on [neo4j-cypher-guide](https://github.com/tomasonjo/blogs) modern Cypher 
 - **`elementId()` not `id()`**: The `id()` function is deprecated; use `elementId()` (returns string)
 - **`coalesce()` for optional props**: `coalesce(l.name, l.id)` handles species where `l.name` is null
 - **Always LIMIT**: This graph has 14.5M+ nodes; unbounded queries will be slow
-- **Filter ANNOTATED_WITH by evidence code**: Without filtering, IEA (electronic annotation) floods results. Use `WHERE r.evidence_code IN ["EXP","IDA","IPI","IMP","IGI","IEP"]` for experimental evidence only
+- **Filter ANNOTATED_WITH by evidence code**: Without filtering, IEA (electronic annotation) floods results. Use `WHERE r.evidence IN ["IDA","IPI","IMP","IGI","IEP"]` for experimental evidence only
 - **Filter COEXPRESSES_WITH by correlation_score**: 3.8M edges exist. Use `WHERE r.correlation_score > 0.7` to get meaningful co-expression partners
 
 ### Query checklist
