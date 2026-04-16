@@ -1,36 +1,127 @@
 ---
 name: plantgraph-database
-description: Use when querying PlantGraph (plantgraph.se) for plant gene annotations, interactions, co-expression, orthologues, GO terms, pathways, or knowledge graph data. Covers Arabidopsis, rice, Brachypodium, wheat, maize, poplar, and 60+ other plant species. Use when user mentions PlantGraph, or needs cross-species gene annotation via a Neo4j knowledge graph.
+description: >-
+  Use when querying PlantGraph (plantgraph.se) — a Neo4j knowledge graph and REST API platform
+  for plant gene annotations, interactions, co-expression, orthologues, GO terms, pathways,
+  protein structures, and enrichment data. Covers Arabidopsis, rice, Brachypodium, wheat, maize,
+  poplar, and 120+ other plant species (14.5M+ nodes, 47.9M+ relationships). Also covers:
+  real-time enrichment from 42 sources (UniProt, STRING, AlphaFold, KEGG, InterPro, Expression Atlas),
+  AI-powered question generation and hypothesis generation, GNN function predictions, paper evidence
+  verification, and natural language graph queries. Use when user mentions PlantGraph, or needs
+  cross-species gene annotation, protein interactions, pathway enrichment, or literature evidence
+  via a plant biology knowledge graph.
 ---
 
-# PlantGraph Neo4j Knowledge Graph
+# PlantGraph Knowledge Graph & API Platform
 
-Public API at `plantgraph.se` (UPSC, Umeå Plant Science Centre). 1.6M loci across 60+ plant species, 132 node types, 149 relationship types. No authentication required for graph queries.
+Public API at `plantgraph.se` (UPSC, Umea Plant Science Centre). 14.5M+ nodes, 47.9M+ relationships, 127 species, 132 node types, 149 relationship types. Integrates 140+ data sources with 42 real-time enrichment services.
+
+## Authentication
+
+**Base URL:** `https://plantgraph.se`
+
+Two path prefixes: `/api/` (REST endpoints, require JWT) and `/api/v1/` (Cypher query, search, paper evidence — some work without auth).
+
+### JWT Login
+```bash
+curl -s -X POST https://plantgraph.se/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "YOUR_USER", "password": "YOUR_PASS"}'
+# Returns: {"access_token": "eyJ...", "token_type": "bearer", "expires_in": 86400}
+```
+
+Use token: `-H "Authorization: Bearer YOUR_TOKEN"`
+
+Refresh before expiry: `POST /api/auth/refresh` with bearer header.
+
+### Rate Limits
+
+| Tier | Limit | Burst |
+|---|---|---|
+| Guest | 60/hour | 10/minute |
+| Researcher | 1000/hour | 60/minute |
+
+Exceeding returns `429 Too Many Requests`.
+
+---
 
 ## API Endpoints
 
+### Graph
+
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/v1/graph/query` | POST | No | **Raw Cypher against Neo4j** |
-| `/api/v1/gene-enrichment/analyze` | POST | No | GO enrichment (Arabidopsis IDs only, min 2) |
+| `/api/graph/gene/{gene_id}` | GET | JWT | Gene details |
+| `/api/graph/search?q=&limit=&offset=` | GET | JWT | Search genes (max 100) |
+| `/api/graph/gene/{gene_id}/neighbors` | GET | JWT | Connected nodes (filter by rel type, direction) |
+| `/api/graph/gene/{gene_id}/pathways` | GET | JWT | Pathway membership |
+| `/api/graph/gene/{gene_id}/stats` | GET | JWT | Counts |
+| `/api/graph/pathway/{pathway_id}` | GET | JWT | Pathway with genes, reactions, compounds |
+| `/api/graph/pathways?source=&q=` | GET | JWT | List/search pathways |
+| `/api/graph/network/interactions` | POST | JWT | Interaction network for gene list |
+| `/api/graph/network/coexpression` | POST | JWT | Co-expression network |
+| `/api/graph/network/regulatory` | POST | JWT | Regulatory network |
+| `/api/graph/stats` | GET | JWT | Graph-wide counts |
+| `/api/graph/query` | POST | JWT | Raw Cypher |
+| `/api/graph/query/natural` | POST | JWT | NL -> Cypher -> results |
+| `/api/v1/graph/query` | POST | No | Raw Cypher (no auth needed) |
+
+### Search
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/v1/search/terms?q=` | GET | No | Term resolution (Arabidopsis only) |
+| `/api/v1/search/genes?q=&limit=&offset=` | GET | No | Multi-species gene search |
+
+### Enrichment
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/enrichment/gene/{gene_id}` | GET | JWT | All 42 sources (~30s) |
+| `/api/enrichment/gene/{gene_id}?sources=a,b` | GET | JWT | Selective sources |
+| `/api/enrichment/gene/{gene_id}/{source}` | GET | JWT | Single source |
+| `/api/enrichment/batch` | POST | JWT | Multiple genes + sources |
+| `/api/enrichment/analysis/go` | POST | JWT | GO enrichment analysis |
+| `/api/enrichment/analysis/pathway` | POST | JWT | Pathway enrichment analysis |
+| `/api/enrichment/cache/status/{gene_id}` | GET | JWT | Cache info |
+| `/api/v1/gene-enrichment/analyze` | POST | No | Legacy GO (Ath only, min 2 genes) |
+
+### AI
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/questions/generate-from-abstract` | POST | JWT | Research questions from abstract |
+| `/api/questions/generate-from-pmid` | POST | JWT | Research questions from PMID |
+| `/api/questions/random-pmid` | GET | JWT | Random paper |
+| `/api/chat/message` | POST | JWT | Chat with sources |
+| `/api/chat/sessions` | POST/GET | JWT | Session management |
+| `/api/chat/sessions/{id}/history` | GET | JWT | Conversation history |
+| `/api/ai/query` | POST | JWT | NL question -> Cypher -> results + confidence |
+| `/api/ai/hypothesis` | POST | JWT | Hypothesis generation |
+| `/api/gnn/predict/{gene_id}` | GET | JWT | GNN function predictions |
+| `/api/gnn/predict/links` | POST | JWT | Predict novel relationships |
+| `/api/qa-discovery/start` | POST | JWT | Autonomous Q&A discovery |
+| `/api/qa-discovery/{id}/status` | GET | JWT | Progress |
+| `/api/qa-discovery/{id}/results` | GET | JWT | Results + synthesis |
+
+### Paper Evidence
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/v1/paper-evidence/check-abstract` | POST | No | Score abstract (0-100) |
+| `/api/v1/paper-evidence/verify-claims` | POST | No | Verify claims (SSE stream) |
+| `/api/v1/paper-evidence/check` | POST | No | PDF upload score |
+| `/api/v1/paper-evidence/verify-claims-pdf` | POST | No | PDF verify (SSE stream) |
+
+### Auth & Status
+
+| Endpoint | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/auth/login` | POST | No | JWT login |
+| `/api/auth/refresh` | POST | JWT | Token refresh |
 | `/api/v1/status` | GET | No | Health check |
-| `/api/v1/search/terms` | GET | No | Term search |
 
-### Query Format
-
-```bash
-curl -s -X POST https://plantgraph.se/api/v1/graph/query \
-  -H "Content-Type: application/json" \
-  -d '{"query":"MATCH (l:Locus {name: \"AT2G40150\"}) RETURN l.name, l.description LIMIT 1"}'
-```
-
-### Enrichment Format
-
-```bash
-curl -s -X POST https://plantgraph.se/api/v1/gene-enrichment/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"gene_ids":["AT1G01010","AT1G01020"],"categories":["GO"],"p_threshold":0.05}'
-```
+---
 
 ## ID Format by Species
 
@@ -126,95 +217,54 @@ GET /api/v1/search/terms?q=AT2G40150   -> same
 ```
 Only resolves Arabidopsis symbols and TAIR IDs. Does not find Brachypodium or other species.
 
-## Common Query Patterns
+---
 
-### Get GO annotations
+## Top 10 Common Query Patterns
+
+### 1. Get GO annotations
 ```cypher
 MATCH (l:Locus {name: "AT2G40150"})-[:ANNOTATED_WITH]->(go:GO)
 RETURN go.id, go.name
 ```
 
-### Get protein interactions
+### 2. Get protein interactions
 ```cypher
 MATCH (l:Locus {name: "AT2G40150"})-[:INTERACTS_WITH]->(p:Locus)
 RETURN p.name, p.symbol, p.description
 ```
 
-### Get co-expression partners
+### 3. Get co-expression partners
 ```cypher
 MATCH (l:Locus {name: "AT2G40150"})-[:COEXPRESSES_WITH]->(c:Locus)
 RETURN c.name, c.symbol, c.description
 ```
 
-### Get regulatory network (who regulates a gene — incoming edges)
+### 4. Get regulatory network (who regulates a gene -- incoming edges)
 ```cypher
 MATCH (tf:Locus)-[r:REGULATES|ACTIVATES|REPRESSES]->(l:Locus {name: "AT2G40150"})
 RETURN tf.name, tf.symbol, type(r) AS regulation_type
 ```
 
-### Get DAP-seq validated TF binding (gold standard)
-```cypher
-MATCH (tf:Locus)-[:DAPSEQ_BINDS_PROMOTER]->(l:Locus {name: "AT2G40150"})
-RETURN tf.name, tf.symbol
-```
+### 5. Get orthologues (specific species)
 
-### Get GWAS trait associations
-```cypher
-MATCH (l:Locus {name: "AT2G40150"})-[:ASSOCIATED_WITH_TRAIT]->(t)
-RETURN t.name AS trait
-```
+**Note:** `ORTHOLOGOUS_TO` direction is an implementation detail, not Arabidopsis-anchored. Always use undirected match for cross-species lookups.
 
-### Get protein complex membership
-```cypher
-MATCH (l:Locus {name: "AT2G40150"})-[:MEMBER_OF_COMPLEX|PART_OF_COMPLEX]->(c)
-RETURN c.name AS complex_name
-```
-
-### Get nutrient/pathogen responses
-```cypher
-MATCH (l:Locus {name: "AT1G02860"})-[:RESPONDS_TO_NUTRIENT]->(n)
-RETURN n.name AS nutrient
--- Pathogen:
-MATCH (l:Locus {name: "AT1G01190"})-[:RESPONDS_TO_PATHOGEN]->(p)
-RETURN p.name AS pathogen
-```
-
-### Get publications mentioning a gene
-```cypher
-MATCH (l:Locus {name: "AT2G40150"})-[:PUBLISHED_IN|MENTIONED_IN]->(pub:Publication)
-RETURN pub.title, pub.pmid LIMIT 10
-```
-
-### Get histone marks
-```cypher
-MATCH (l:Locus {name: "AT3G20810"})-[:HAS_HISTONE_MARK]->(h)
-RETURN h.id LIMIT 10
--- Note: h.id contains mark type e.g. "AraENC_H3K27me3_Chr3_..."
-```
-
-### Get cell-type expression (single-cell resolution)
-```cypher
-MATCH (l:Locus {name: "AT2G40150"})-[:EXPRESSED_IN_CELL_TYPE]->(ct:CellType)
-RETURN ct.name LIMIT 10
-```
-
-### Get orthologues (specific species)
 ```cypher
 MATCH (a:Locus {name: "AT2G40150"})-[:ORTHOLOGOUS_TO]->(o:Locus)
 WHERE o.species = "Brachypodium distachyon"
 RETURN o.id, o.species
 ```
 
-### Get orthologues (all species with counts)
+### 6. Get orthologues (all species with counts)
 ```cypher
 MATCH (a:Locus {name: "AT2G40150"})-[:ORTHOLOGOUS_TO]->(o:Locus)
 WHERE o.species IS NOT NULL
 RETURN o.species, count(*) AS n ORDER BY n DESC
 ```
 
-### Find Arabidopsis orthologue FROM a non-Arabidopsis gene
+### 7. Find Arabidopsis orthologue FROM a non-Arabidopsis gene
 
-**Critical:** `ORTHOLOGOUS_TO` edges point FROM Arabidopsis outward. To find the Arabidopsis orthologue of a non-Ath gene, use **undirected** match (no arrow):
+**Critical:** Use **undirected** match (no arrow) to find the Arabidopsis orthologue of a non-Ath gene:
 
 ```cypher
 MATCH (b:Locus {id: "BRADI_1g16610v3"})-[:ORTHOLOGOUS_TO]-(a:Locus)
@@ -222,7 +272,7 @@ WHERE a.species = "Arabidopsis thaliana"
 RETURN a.name, a.symbol, a.description
 ```
 
-### Multi-hop: Brachypodium -> Arabidopsis -> interactions
+### 8. Multi-hop: Brachypodium -> Arabidopsis -> interactions
 ```cypher
 MATCH (b:Locus {id: "BRADI_1g16610v3"})-[:ORTHOLOGOUS_TO]-(a:Locus)
 WHERE a.species = "Arabidopsis thaliana"
@@ -231,15 +281,7 @@ MATCH (a)-[:INTERACTS_WITH]->(p:Locus)
 RETURN a.name AS ath_gene, p.name AS interactor, p.description
 ```
 
-### Get all annotations for a gene (relationships + targets)
-```cypher
-MATCH (l:Locus {name: "AT2G40150"})-[r]->(t)
-RETURN type(r) AS rel, labels(t)[0] AS target_type,
-       coalesce(t.name, t.id) AS target, t.description
-LIMIT 50
-```
-
-### Bulk query: multiple genes
+### 9. Bulk query: multiple genes
 ```cypher
 MATCH (l:Locus)
 WHERE l.name IN ["AT1G01430","AT2G40150","AT5G06700"]
@@ -247,52 +289,750 @@ OPTIONAL MATCH (l)-[:ANNOTATED_WITH]->(go:GO)
 RETURN l.name, l.symbol, collect(DISTINCT go.name) AS go_terms
 ```
 
-### Schema introspection
+### 10. Schema introspection
 ```cypher
 CALL db.labels() YIELD label RETURN label
 CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType
 MATCH (l:Locus) RETURN DISTINCT l.species, count(*) AS n ORDER BY n DESC
 ```
 
-## Locus Properties (Arabidopsis)
+---
 
-Arabidopsis `Locus` nodes carry embedded expression data as properties:
-- `atgen_drought_*`, `atgen_salt_*`, `atgen_cold_*` — ATGenExpress stress TPMs
-- `circ_emexp1304_*` — circadian expression
-- `geod*_lfc` — log fold-changes from GEO studies
-- `aranet_enriched` — boolean, co-functional network membership
-- `ensembl_homolog_count` — cross-species homologue count
+## Graph API (REST)
 
-Non-Arabidopsis loci also carry expression properties (e.g., `bradi_mtab4401_leaf_tpm`).
+All `/api/graph/` endpoints require JWT. Pass `-H "Authorization: Bearer $TOKEN"`.
 
-## Species in Graph (top by locus count)
+### Gene lookup
+```bash
+curl -s https://plantgraph.se/api/graph/gene/AT2G40150 \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: gene details, properties, annotation summary
+```
 
-Brassica napus (149K), Triticum aestivum (108K), Brassica oleracea (80K), Glycine max (61K), Arabidopsis thaliana (44K), Oryza sativa japonica (22K), Brachypodium distachyon (15K), Sorghum bicolor (16K), Setaria italica (16K), Zea mays (30K), Populus trichocarpa (35K), Vitis vinifera (37K), plus ~50 more.
+### Gene search
+```bash
+curl -s "https://plantgraph.se/api/graph/search?q=trichome&limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: list of matching genes with id, name, symbol, species, description
+```
+
+### Gene neighbors
+```bash
+curl -s "https://plantgraph.se/api/graph/gene/AT2G40150/neighbors?rel_type=INTERACTS_WITH&direction=both" \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: connected nodes filtered by relationship type and direction
+```
+
+### Gene pathways
+```bash
+curl -s https://plantgraph.se/api/graph/gene/AT2G40150/pathways \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: pathways the gene participates in
+```
+
+### Gene stats
+```bash
+curl -s https://plantgraph.se/api/graph/gene/AT2G40150/stats \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: counts of relationships by type
+```
+
+### Pathway details
+```bash
+curl -s https://plantgraph.se/api/graph/pathway/PWY-5136 \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: pathway with genes, reactions, compounds
+```
+
+### List/search pathways
+```bash
+curl -s "https://plantgraph.se/api/graph/pathways?source=KEGG&q=photosynthesis" \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: matching pathways from specified source
+```
+
+### Interaction network
+```bash
+curl -s -X POST https://plantgraph.se/api/graph/network/interactions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"gene_ids": ["AT2G40150", "AT1G01430", "AT5G06700"]}'
+# Returns: interaction network edges between provided genes and their neighbors
+```
+
+### Co-expression network
+```bash
+curl -s -X POST https://plantgraph.se/api/graph/network/coexpression \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"gene_ids": ["AT2G40150", "AT1G01430"], "min_score": 0.7}'
+# Returns: co-expression edges above score threshold
+```
+
+### Regulatory network
+```bash
+curl -s -X POST https://plantgraph.se/api/graph/network/regulatory \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"gene_ids": ["AT2G40150"], "include_dapseq": true}'
+# Returns: regulatory relationships (TF -> target) for gene list
+```
+
+### Graph-wide stats
+```bash
+curl -s https://plantgraph.se/api/graph/stats \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: total node/relationship counts, species counts, label distribution
+```
+
+### Natural language query
+```bash
+curl -s -X POST https://plantgraph.se/api/graph/query/natural \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What genes interact with FLC in Arabidopsis?"}'
+# Returns: generated Cypher, query results, confidence score
+```
+
+### Raw Cypher (authenticated)
+```bash
+curl -s -X POST https://plantgraph.se/api/graph/query \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "MATCH (l:Locus {name: \"AT2G40150\"}) RETURN l LIMIT 1"}'
+```
+
+### Raw Cypher (no auth)
+```bash
+curl -s -X POST https://plantgraph.se/api/v1/graph/query \
+  -H "Content-Type: application/json" \
+  -d '{"query":"MATCH (l:Locus {name: \"AT2G40150\"}) RETURN l.name, l.description LIMIT 1"}'
+```
+
+### Multi-species gene search
+```bash
+curl -s "https://plantgraph.se/api/v1/search/genes?q=flowering&limit=20&offset=0"
+# Returns: genes across all species matching query
+```
+
+---
+
+## Enrichment API
+
+All `/api/enrichment/` endpoints require JWT unless noted.
+
+### Query patterns
+
+**All 42 sources** (~30s response):
+```bash
+curl -s https://plantgraph.se/api/enrichment/gene/AT2G40150 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Selective sources:**
+```bash
+curl -s "https://plantgraph.se/api/enrichment/gene/AT2G40150?sources=uniprot,string,alphafold" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Single source:**
+```bash
+curl -s https://plantgraph.se/api/enrichment/gene/AT2G40150/uniprot \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 42 Enrichment Sources
+
+**Protein & Structure (7):**
+- `uniprot` — UniProt protein features, function, subcellular location
+- `alphafold` — AlphaFold predicted 3D structure + pLDDT scores
+- `interpro` — InterPro domain/family classification
+- `pfam` — Pfam protein family domains
+- `prosite` — PROSITE patterns and profiles
+- `pdb` — Experimental protein structures from RCSB PDB
+- `swiss_model` — SWISS-MODEL homology models
+
+**Interactions (3):**
+- `string` — STRING protein-protein interaction network + scores
+- `biogrid` — BioGRID experimental interactions
+- `intact` — IntAct molecular interaction data
+
+**Pathways (3):**
+- `kegg` — KEGG pathway maps and enzyme assignments
+- `reactome` — Reactome pathway membership
+- `plantcyc` — PlantCyc/PMN metabolic pathways
+
+**Expression (3):**
+- `expression_atlas` — EBI Expression Atlas experiments
+- `genevestigator` — Genevestigator expression compendium
+- `bar_efp` — BAR eFP Browser expression patterns
+
+**Ontology (3):**
+- `go` — Gene Ontology annotations (BP, MF, CC)
+- `po` — Plant Ontology annotations
+- `to` — Trait Ontology annotations
+
+**Literature (3):**
+- `pubmed` — PubMed publication links
+- `europe_pmc` — Europe PMC full-text mining
+- `preprints` — bioRxiv/medRxiv preprint mentions
+
+**Comparative (4):**
+- `ensembl_plants` — Ensembl Plants orthologues and gene trees
+- `plaza` — PLAZA comparative genomics
+- `phytozome` — Phytozome gene family data
+- `orthodb` — OrthoDB orthologous groups
+
+**Plant-specific (6):**
+- `tair` — TAIR Arabidopsis annotations
+- `rapdb` — RAP-DB rice annotations
+- `gramene` — Gramene plant comparative resources
+- `planttfdb` — PlantTFDB transcription factor classification
+- `plantreactome` — Plant Reactome pathways
+- `epigenome` — Plant epigenome marks and modifications
+
+**Other (4):**
+- `pubchem` — PubChem compound links
+- `chembl` — ChEMBL bioactivity data
+- `brenda` — BRENDA enzyme kinetics
+- `phosphat` — PhosPhAt phosphoproteomics
+
+### Batch enrichment
+```bash
+curl -s -X POST https://plantgraph.se/api/enrichment/batch \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gene_ids": ["AT2G40150", "AT1G01430", "AT5G06700"],
+    "sources": ["uniprot", "string", "go"]
+  }'
+# Returns: enrichment results per gene per source
+```
+
+### GO enrichment analysis
+```bash
+curl -s -X POST https://plantgraph.se/api/enrichment/analysis/go \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gene_ids": ["AT2G40150", "AT1G01430", "AT5G06700", "AT3G20810"],
+    "categories": ["biological_process", "molecular_function", "cellular_component"],
+    "p_threshold": 0.05,
+    "correction": "benjamini_hochberg"
+  }'
+# Returns: enriched GO terms with p-values, fold enrichment, gene counts
+```
+
+### Pathway enrichment analysis
+```bash
+curl -s -X POST https://plantgraph.se/api/enrichment/analysis/pathway \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gene_ids": ["AT2G40150", "AT1G01430", "AT5G06700"],
+    "sources": ["kegg", "reactome", "plantcyc"],
+    "p_threshold": 0.05
+  }'
+# Returns: enriched pathways with p-values, gene overlap
+```
+
+### Legacy enrichment (Arabidopsis-only, no auth)
+```bash
+curl -s -X POST https://plantgraph.se/api/v1/gene-enrichment/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"gene_ids":["AT1G01010","AT1G01020"],"categories":["GO"],"p_threshold":0.05}'
+```
+**Constraints:** Arabidopsis IDs only, minimum 2 genes, `p_threshold` max 0.5.
+
+### Cache status
+```bash
+curl -s https://plantgraph.se/api/enrichment/cache/status/AT2G40150 \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: cached sources, timestamps, staleness info
+```
+
+---
+
+## AI API
+
+All `/api/` AI endpoints require JWT.
+
+### Question generation from abstract
+```bash
+curl -s -X POST https://plantgraph.se/api/questions/generate-from-abstract \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "abstract": "We investigated the role of FLC in vernalization-mediated flowering...",
+    "num_questions": 5
+  }'
+# Returns: research questions with rationale, graph-queryable aspects
+```
+
+### Question generation from PMID
+```bash
+curl -s -X POST https://plantgraph.se/api/questions/generate-from-pmid \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"pmid": "34567890"}'
+# Returns: research questions derived from the paper
+```
+
+### Random paper
+```bash
+curl -s https://plantgraph.se/api/questions/random-pmid \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: random PMID from the graph's 290K publications
+```
+
+### Chat with sources
+```bash
+curl -s -X POST https://plantgraph.se/api/chat/message \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "sess_abc123",
+    "message": "What are the main regulators of flowering time in Arabidopsis?"
+  }'
+# Returns: AI response with cited sources from the knowledge graph
+```
+
+### Session management
+```bash
+# Create session
+curl -s -X POST https://plantgraph.se/api/chat/sessions \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Flowering research"}'
+
+# List sessions
+curl -s https://plantgraph.se/api/chat/sessions \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Conversation history
+```bash
+curl -s https://plantgraph.se/api/chat/sessions/sess_abc123/history \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: full message history with sources
+```
+
+### Natural language query (AI)
+```bash
+curl -s -X POST https://plantgraph.se/api/ai/query \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Which transcription factors regulate FLC expression?"}'
+# Returns: generated Cypher, results, confidence score, explanation
+```
+
+### Hypothesis generation
+```bash
+curl -s -X POST https://plantgraph.se/api/ai/hypothesis \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gene_ids": ["AT5G10140", "AT3G18990"],
+    "context": "cold stress response"
+  }'
+# Returns: hypotheses with supporting evidence from graph, confidence scores
+```
+
+### GNN function predictions
+```bash
+curl -s https://plantgraph.se/api/gnn/predict/AT2G40150 \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: predicted GO terms/functions from graph neural network with confidence
+```
+
+### GNN link prediction
+```bash
+curl -s -X POST https://plantgraph.se/api/gnn/predict/links \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gene_id": "AT2G40150",
+    "rel_types": ["INTERACTS_WITH", "COEXPRESSES_WITH"],
+    "top_k": 20
+  }'
+# Returns: predicted novel relationships with probability scores
+```
+
+### Q&A Discovery (autonomous loop)
+
+**Start discovery:**
+```bash
+curl -s -X POST https://plantgraph.se/api/qa-discovery/start \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "cell wall biosynthesis in grasses",
+    "max_iterations": 10,
+    "depth": "deep"
+  }'
+# Returns: {"discovery_id": "disc_xyz789", "status": "running"}
+```
+
+**Check progress:**
+```bash
+curl -s https://plantgraph.se/api/qa-discovery/disc_xyz789/status \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: iteration count, questions asked, findings so far
+```
+
+**Get results:**
+```bash
+curl -s https://plantgraph.se/api/qa-discovery/disc_xyz789/results \
+  -H "Authorization: Bearer $TOKEN"
+# Returns: all Q&A pairs, synthesis, novel connections found
+```
+
+---
+
+## Paper Evidence API
+
+Uses `/api/v1/` prefix. No auth required. Processing takes 30-70s for claim verification.
+
+### Check abstract (score)
+```bash
+curl -s -X POST https://plantgraph.se/api/v1/paper-evidence/check-abstract \
+  -H "Content-Type: application/json" \
+  -d '{
+    "abstract_text": "FLC is a key repressor of flowering in Arabidopsis, regulated by vernalization through epigenetic silencing via Polycomb..."
+  }'
+# Returns:
+# {
+#   "overall_score": 85,
+#   "score_tier": "strong",
+#   "entities": [{"name": "FLC", "type": "gene", "id": "AT5G10140"}, ...],
+#   "evidence": {
+#     "graph_support": 0.9,
+#     "literature_support": 0.8,
+#     "interaction_support": 0.85
+#   }
+# }
+```
+
+### Verify claims (SSE stream)
+```bash
+curl -s -X POST https://plantgraph.se/api/v1/paper-evidence/verify-claims \
+  -H "Content-Type: application/json" \
+  -d '{
+    "abstract_text": "FLC is repressed by VIN3 during vernalization...",
+    "claims": [
+      "FLC interacts with SVP to repress flowering",
+      "VIN3 is induced by cold exposure"
+    ]
+  }'
+# SSE stream events:
+# data: {"type": "claim_extracted", "claim": "FLC interacts with SVP..."}
+# data: {"type": "entity_report", "entities": [...]}
+# data: {"type": "claim_verified", "claim": "FLC interacts with SVP...",
+#         "verdict": "supported", "evidence": [...], "confidence": 0.92}
+# data: {"type": "claim_verified", "claim": "VIN3 is induced by cold...",
+#         "verdict": "partially_supported", "evidence": [...], "confidence": 0.65}
+# data: {"type": "complete", "summary": {...}}
+```
+
+If `claims` is omitted, claims are auto-generated from the abstract text.
+
+Verdict values: `supported`, `partially_supported`, `not_found`.
+
+### PDF upload (score)
+```bash
+curl -s -X POST https://plantgraph.se/api/v1/paper-evidence/check \
+  -F "file=@paper.pdf"
+# Returns: same format as check-abstract
+```
+
+### PDF verify (SSE stream)
+```bash
+curl -s -X POST https://plantgraph.se/api/v1/paper-evidence/verify-claims-pdf \
+  -F "file=@paper.pdf"
+# Returns: SSE stream same as verify-claims
+```
+
+---
+
+## Cypher Deep Reference
+
+### Node Labels (132)
+
+**Gene-level:**
+`Locus`, `Transcript`, `Protein`, `Gene`, `SmallORF`/`sORF`, `CircRNA`/`CircularRNA`, `LncRNA`/`lncRNA`, `SmallRNA`
+
+**Annotation:**
+`GO`, `PO`, `TO`, `BTO`, `PECO`, `ENVO`, `ProteinDomain`, `InterProDomain`, `MapManBin`, `Pathway`, `Enzyme`, `Reaction`, `MetabolicCompound`
+
+**Taxonomy:**
+`Species`, `NCBITaxon`, `GeneFamily`, `PhytozomeGeneFamily`, `ProteinFamily`
+
+**Regulation:**
+`TranscriptionFactorFamily`, `Promoter`, `BindingSite`, `BindingMotif`, `TFMotif`, `Motif`, `RegulatoryElement`, `ReMapPeak`, `PeakRegion`, `DHSRegion`, `ChromatinAccessibilityPeak`, `SignalTrack`
+
+**Expression:**
+`Tissue`, `CellType`, `ExpressionProfile` (7.3M), `DiurnalProfile`, `DevelopmentalStage`, `SpatialRegion`, `SpatialZone`, `DiurnalCondition`
+
+**Experiment:**
+`Experiment`, `Study`, `Sample`, `GrowthCondition`, `Condition`, `StressCondition`, `StressExperiment`, `StressTimePoint`, `TimePoint`, `RnaSeqLibrary`, `MicroarrayPlatform`, `EBIAtlasExperiment`, `BARExperiment`, `GSE`, `GSM`, `MetaboLightsStudy`
+
+**Literature:**
+`Publication` (290K), `Preprint`, `Author` (105K), `Journal`, `MeSH`
+
+**Variants/GWAS:**
+`SNP` (1.3M), `INDEL`, `GWASStudy`, `Trait`, `PlantTrait`, `AraphenoStudy`, `Germplasm`
+
+**Protein features:**
+`UniProt`, `ProteinComplex`, `Complex`, `ProteinStructure`, `ProteinFeature`, `ProteinLigand`, `Ligand`, `LigandBinding`, `LigandBindingSite`, `ProteomicsEvidence`
+
+**PTM sites:**
+`PhosphorylationSite` (190K), `UbiquitinationSite`, `AcetylationSite`, `SUMOylationSite`, `SnitrosylationSite`, `SulfenylationSite`, `GlcNAcylationSite`, `MethylationSite` (2.9M), `PTMSite`
+
+**Chemistry:**
+`ChEBICompound`, `KnapsackCompound`, `Metabolite`, `NaturalProduct`, `Phytochemical`, `PhytochemicalCompound`, `PhytohubCompound`
+
+**Epigenetics:**
+`MethylationContext`, `HistoneModification` (154K)
+
+**Pathogen:**
+`Pathogen`, `PathogenEffector`, `PathogenGene`, `PHIGene`, `PHIInteraction`, `PHIOrganism`, `PHIPOTerm`, `MicrobeInteraction`
+
+**Biosynthesis:**
+`BGC_Cluster`, `BGCluster`, `BiosynthesisCluster`, `BiosyntheticCluster` (legacy duplicates)
+
+**Other:**
+`SubcellularCompartment`, `CellularCompartment`, `GeneXref`, `OntologyAnchor`, `Hormone`, `Nutrient`, `Phenotype`, `ClimateAdaptation`, `Institution`, `PMNDatabase`, `TAIRLocus`, `TAIRObject`
+
+### Relationship Types (149)
+
+**Top 20 by count:**
+
+| Relationship | Count |
+|---|---|
+| `HAS_METHYLATION` | 2.9M |
+| `EXPRESSED_IN` | 7.3M |
+| `COEXPRESSES_WITH` | 3.8M |
+| `ANNOTATED_WITH` | 2.1M |
+| `ORTHOLOGOUS_TO` | 1.8M |
+| `HAS_DOMAIN` | 1.2M |
+| `INTERACTS_WITH` | 890K |
+| `HAS_SNP` | 1.3M |
+| `MENTIONED_IN` | 1.1M |
+| `HAS_PHOSPHORYLATION_SITE` | 190K |
+| `HAS_HISTONE_MARK` | 154K |
+| `MEMBER_OF_GENE_FAMILY` | 420K |
+| `BELONGS_TO_PATHWAY` | 310K |
+| `COFUNCTIONAL_WITH` | 280K |
+| `HAS_INTERPRO_DOMAIN` | 250K |
+| `EXPRESSED_IN_TISSUE` | 220K |
+| `DAPSEQ_BINDS_PROMOTER` | 180K |
+| `PARALOGOUS_TO` | 160K |
+| `EXPRESSED_UNDER_STRESS` | 140K |
+| `PUBLISHED_IN` | 130K |
+
+**Full list by category:**
+
+**Gene-gene:** `INTERACTS_WITH`, `COEXPRESSES_WITH`, `COFUNCTIONAL_WITH`, `ORTHOLOGOUS_TO`, `PARALOGOUS_TO`, `HOMOLOGOUS_TO`, `SYNTENIC_WITH`
+
+**Regulation:** `REGULATES`, `ACTIVATES`, `REPRESSES`, `TARGETS`, `BINDS_TO`, `BINDS_PROMOTER`, `DAPSEQ_BINDS_PROMOTER`, `BINDS_ENHANCER`, `BINDS_MOTIF`
+
+**Annotation:** `ANNOTATED_WITH`, `ANNOTATED_WITH_PO`, `ANNOTATED_WITH_TO`, `HAS_DOMAIN`, `HAS_INTERPRO_DOMAIN`, `HAS_MAPMAN_BIN`, `HAS_KEGG_ORTHOLOGY`, `NCBI_ANNOTATED_WITH`
+
+**Membership:** `MEMBER_OF`, `MEMBER_OF_TF_FAMILY`, `MEMBER_OF_GENE_FAMILY`, `MEMBER_OF_COMPLEX`, `PART_OF_COMPLEX`, `PARTICIPATES_IN`, `BELONGS_TO_PATHWAY`, `PART_OF_PATHWAY`
+
+**Expression:** `EXPRESSED_IN`, `EXPRESSED_IN_TISSUE`, `EXPRESSED_IN_CELL_TYPE`, `EXPRESSED_UNDER_STRESS`, `EXPRESSED_IN_SPATIAL_REGION`, `EXPRESSED_IN_SPATIAL_ZONE`, `HAS_EXPRESSION_PROFILE`, `HAS_DIURNAL_PROFILE`
+
+**Responses:** `RESPONDS_TO_HORMONE`, `RESPONDS_TO_NUTRIENT`, `RESPONDS_TO_PATHOGEN`, `RESPONDS_TO_STRESS`, `RESPONDS_TO_LIGHT`
+
+**Life history:** `INVOLVED_IN_FLOWERING`, `CITED_IN_FLOWERING`, `INVOLVED_IN_ADAPTATION`, `ASSOCIATED_WITH_TRAIT`
+
+**Epigenetics:** `HAS_HISTONE_MARK`, `HAS_METHYLATION`, `HAS_CHROMATIN_STATE`
+
+**PTMs:** `HAS_PHOSPHORYLATION_SITE`, `HAS_UBIQUITINATION_SITE`, `HAS_ACETYLATION_SITE`, `HAS_SUMOYLATION_SITE`, `HAS_SNITROSYLATION_SITE`, `HAS_SULFENYLATION_SITE`, `HAS_GLCNACYLATION_SITE`, `HAS_METHYLATION_SITE`
+
+**Protein:** `MAPS_TO`, `HAS_STRUCTURE`, `HAS_FEATURE`, `HAS_LIGAND`, `BINDS_LIGAND`, `ENCODES_ENZYME`, `CATALYZES`, `CATALYZES_REACTION`
+
+**Variants:** `HAS_SNP`, `HAS_INDEL`, `ASSOCIATED_WITH_GWAS`, `ASSOCIATED_WITH_TRAIT`
+
+**Literature:** `PUBLISHED_IN`, `MENTIONED_IN`, `CITED_IN_FLOWERING`, `AUTHORED_BY`, `HAS_MESH`
+
+**Taxonomy:** `BELONGS_TO_SPECIES`, `HAS_TAXON`, `IN_GENE_FAMILY`, `IN_PROTEIN_FAMILY`
+
+**Pathogen:** `INTERACTS_WITH_PATHOGEN`, `TARGETED_BY_EFFECTOR`, `PHI_INTERACTION`
+
+### Relationship Properties
+
+| Relationship | Properties |
+|---|---|
+| `INTERACTS_WITH` | `source`, `score`, `experimental_system`, `detection_method`, `pubmed_id` |
+| `COEXPRESSES_WITH` | `correlation_score`, `mutual_rank`, `source`, `tissue`, `condition` |
+| `ANNOTATED_WITH` | `evidence_code`, `source`, `date`, `qualifier`, `aspect` |
+| `ORTHOLOGOUS_TO` | `method`, `score`, `source`, `identity_percent` |
+| `EXPRESSED_UNDER_STRESS` | `stress_type`, `log2fc`, `padj`, `timepoint`, `tissue`, `experiment_id` |
+| `DAPSEQ_BINDS_PROMOTER` | `peak_score`, `distance_to_tss`, `motif`, `source` |
+| `NCBI_ANNOTATED_WITH` | `evidence_code`, `source`, `date` |
+
+**Filter GO by evidence code:**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[r:ANNOTATED_WITH]->(go:GO)
+WHERE r.evidence_code IN ["EXP", "IDA", "IPI", "IMP", "IGI", "IEP"]
+RETURN go.id, go.name, r.evidence_code
+```
+
+**Filter co-expression by score:**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[r:COEXPRESSES_WITH]->(c:Locus)
+WHERE r.correlation_score > 0.8
+RETURN c.name, c.symbol, r.correlation_score
+ORDER BY r.correlation_score DESC LIMIT 20
+```
+
+**Filter stress expression by log2fc:**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[r:EXPRESSED_UNDER_STRESS]->(s)
+WHERE abs(r.log2fc) > 2
+RETURN s.name AS stress, r.log2fc, r.padj, r.timepoint
+ORDER BY abs(r.log2fc) DESC
+```
+
+### Node Properties
+
+**Locus (Arabidopsis):**
+`name` (AT-format), `id`, `symbol`, `description`, `species`, `chromosome`, `start`, `end`, `strand`, `gene_model_type`, `aranet_enriched` (boolean), `ensembl_homolog_count`, `atgen_drought_*`/`atgen_salt_*`/`atgen_cold_*` (ATGenExpress stress TPMs), `circ_emexp1304_*` (circadian expression), `geod*_lfc` (GEO log fold-changes)
+
+**Locus (non-Arabidopsis):**
+`id` (species-specific format), `species`, `description`, `chromosome`, `start`, `end`, `strand`. Also carries expression properties (e.g., `bradi_mtab4401_leaf_tpm`). `name` is null — always use `id` for lookups.
+
+**GO:**
+`id` (GO:0000001 format), `name`, `definition`, `namespace` (biological_process, molecular_function, cellular_component)
+
+**Publication:**
+`pmid`, `title`, `abstract`, `year`, `journal`, `doi`, `research_concepts`. **Warning:** `research_concepts` type is inconsistent — may be a string or a list depending on the publication. Always handle both types.
+
+**Species:**
+`name`, `common_name`, `taxonomy_id`, `locus_count`
+
+**Pathway:**
+`id`, `name`, `source` (KEGG, Reactome, PlantCyc, PMN), `description`, `species`
+
+### Fulltext Indexes (7)
+
+| Index Name | Label | Properties |
+|---|---|---|
+| `gene_fulltext` | Locus | symbol, name, description |
+| `go_fulltext` | GO | name, definition |
+| `publication_fulltext` | Publication | title, abstract |
+| `pathway_fulltext` | Pathway | name, description |
+| `compound_fulltext` | MetabolicCompound | name, formula |
+| `enzyme_fulltext` | Enzyme | name, ec_number |
+| `reaction_fulltext` | Reaction | name, equation |
+
+**Example:**
+```cypher
+CALL db.index.fulltext.queryNodes("gene_fulltext", "cellulose synthase")
+YIELD node, score
+RETURN node.id, node.symbol, node.species, node.description, score
+ORDER BY score DESC LIMIT 15
+```
+
+### Key Indexes
+
+Composite indexes exist on `Locus(name)`, `Locus(id)`, `Locus(symbol)`, `Locus(species)`, `GO(id)`, `Publication(pmid)`, `SNP(id)`, `UniProt(id)`. Property lookups using these fields are fast; avoid `WHERE l.description CONTAINS` on large result sets (use fulltext index instead).
+
+### Additional Query Patterns
+
+**DAP-seq validated TF binding (gold standard):**
+```cypher
+MATCH (tf:Locus)-[:DAPSEQ_BINDS_PROMOTER]->(l:Locus {name: "AT2G40150"})
+RETURN tf.name, tf.symbol
+```
+
+**GWAS trait associations:**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[:ASSOCIATED_WITH_TRAIT]->(t)
+RETURN t.name AS trait
+```
+
+**Protein complex membership:**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[:MEMBER_OF_COMPLEX|PART_OF_COMPLEX]->(c)
+RETURN c.name AS complex_name
+```
+
+**Nutrient/pathogen responses:**
+```cypher
+MATCH (l:Locus {name: "AT1G02860"})-[:RESPONDS_TO_NUTRIENT]->(n)
+RETURN n.name AS nutrient
+-- Pathogen:
+MATCH (l:Locus {name: "AT1G01190"})-[:RESPONDS_TO_PATHOGEN]->(p)
+RETURN p.name AS pathogen
+```
+
+**Publications mentioning a gene:**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[:PUBLISHED_IN|MENTIONED_IN]->(pub:Publication)
+RETURN pub.title, pub.pmid LIMIT 10
+```
+
+**Histone marks:**
+```cypher
+MATCH (l:Locus {name: "AT3G20810"})-[:HAS_HISTONE_MARK]->(h)
+RETURN h.id LIMIT 10
+-- Note: h.id contains mark type e.g. "AraENC_H3K27me3_Chr3_..."
+```
+
+**Cell-type expression (single-cell resolution):**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[:EXPRESSED_IN_CELL_TYPE]->(ct:CellType)
+RETURN ct.name LIMIT 10
+```
+
+**Spatial expression:**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[:EXPRESSED_IN_SPATIAL_REGION]->(sr:SpatialRegion)
+RETURN sr.name, sr.tissue LIMIT 10
+```
+
+**Methylation context:**
+```cypher
+MATCH (l:Locus {name: "AT3G20810"})-[:HAS_METHYLATION]->(m:MethylationContext)
+RETURN m.context, m.level LIMIT 10
+```
+
+**All-annotations dump:**
+```cypher
+MATCH (l:Locus {name: "AT2G40150"})-[r]->(t)
+RETURN type(r) AS rel, labels(t)[0] AS target_type,
+       coalesce(t.name, t.id) AS target, t.description
+LIMIT 50
+```
+
+---
+
+## Species in Graph
+
+127 species, 1.62M loci. Top 20 by locus count:
+
+| Species | Loci | Species | Loci |
+|---|---|---|---|
+| Brassica napus | 149K | Sorghum bicolor | 16K |
+| Triticum aestivum | 108K | Setaria italica | 16K |
+| Brassica oleracea | 80K | Brachypodium distachyon | 15K |
+| Glycine max | 61K | Solanum lycopersicum | 14K |
+| Arabidopsis thaliana | 44K | Medicago truncatula | 13K |
+| Vitis vinifera | 37K | Oryza sativa | 13K |
+| Populus trichocarpa | 35K | Phaseolus vulgaris | 12K |
+| Zea mays | 30K | Cucumis sativus | 11K |
+| Oryza sativa subsp. japonica | 22K | Gossypium raimondii | 10K |
+| Solanum tuberosum | 18K | Prunus persica | 9K |
+
+Additional species include Capsella rubella, Camelina sativa, Linum usitatissimum, Manihot esculenta, Theobroma cacao, Citrus sinensis, Eucalyptus grandis, Fragaria vesca, Aquilegia coerulea, Amborella trichopoda, Selaginella moellendorffii, Physcomitrella patens, Chlamydomonas reinhardtii, and 80+ more.
 
 **Not in graph:** Hordeum vulgare, Brachypodium sylvaticum. For these species, use orthologue chains via Brachypodium distachyon or Arabidopsis.
 
-## R Integration (httr/jsonlite)
+**Rice species string note:** Rice appears as both `"Oryza sativa"` (13K loci) and `"Oryza sativa subsp. japonica"` (22K loci). Check both when querying rice genes.
 
-```r
-library(httr)
-library(jsonlite)
-
-plantgraph_query <- function(cypher) {
-  resp <- POST(
-    "https://plantgraph.se/api/v1/graph/query",
-    body = list(query = cypher),
-    encode = "json",
-    content_type_json()
-  )
-  content(resp, as = "parsed", simplifyVector = TRUE)$results
-}
-
-# Example: get GO terms for a Brachypodium gene
-plantgraph_query('
-  MATCH (l:Locus {id: "BRADI_1g16610v3"})-[:ANNOTATED_WITH]->(go:GO)
-  RETURN go.id, go.name
-')
-```
+---
 
 ## Cypher Best Practices (for PlantGraph queries)
 
@@ -304,7 +1044,9 @@ Based on [neo4j-cypher-guide](https://github.com/tomasonjo/blogs) modern Cypher 
 - **Explicit grouping**: Use `WITH` clauses before aggregations to make grouping keys explicit
 - **`elementId()` not `id()`**: The `id()` function is deprecated; use `elementId()` (returns string)
 - **`coalesce()` for optional props**: `coalesce(l.name, l.id)` handles species where `l.name` is null
-- **Always LIMIT**: This graph has 1.6M loci; unbounded queries will be slow
+- **Always LIMIT**: This graph has 14.5M+ nodes; unbounded queries will be slow
+- **Filter ANNOTATED_WITH by evidence code**: Without filtering, IEA (electronic annotation) floods results. Use `WHERE r.evidence_code IN ["EXP","IDA","IPI","IMP","IGI","IEP"]` for experimental evidence only
+- **Filter COEXPRESSES_WITH by correlation_score**: 3.8M edges exist. Use `WHERE r.correlation_score > 0.7` to get meaningful co-expression partners
 
 ### Query checklist
 1. No deprecated functions (`id()`, `size()` for patterns, `exists()`)
@@ -313,14 +1055,184 @@ Based on [neo4j-cypher-guide](https://github.com/tomasonjo/blogs) modern Cypher 
 4. Undirected match for reverse orthologue lookups
 5. `coalesce(t.name, t.id)` when displaying cross-species results
 
+---
+
 ## Common Mistakes
 
 - Using `l.name` for non-Arabidopsis species (use `l.id`)
 - Using Phytozome `Bradi1g*` format (must convert to `BRADI_1g*v3`)
 - Using MSU rice IDs `LOC_Os*` (PlantGraph uses RAP format `Os*`)
 - Expecting barley (`HORVU.*`) to exist (it doesn't; use orthologue hop)
-- Using directed `->` for reverse orthologue lookups. `ORTHOLOGOUS_TO` edges radiate FROM Arabidopsis. To find the Ath orthologue of a Bdis gene, use undirected `-[:ORTHOLOGOUS_TO]-` (no arrow)
+- Using directed `->` for reverse orthologue lookups. `ORTHOLOGOUS_TO` direction is an implementation detail. To find the Ath orthologue of a Bdis gene, use undirected `-[:ORTHOLOGOUS_TO]-` (no arrow)
 - Querying regulatory network in wrong direction. `REGULATES`, `ACTIVATES`, `REPRESSES`, `DAPSEQ_BINDS_PROMOTER` edges point FROM the regulator TO the target. To find "who regulates gene X", use `(tf)-[:REGULATES]->(l {name: "X"})` (incoming to your gene)
 - Using `EXPRESSED_IN_TISSUE` with `(t:Tissue)` -- the target is actually `DevelopmentalStage`, not `Tissue`. Use `(t)` without label constraint
 - Forgetting `LIMIT` on broad queries (the graph is large). `INTERACTS_WITH` and `COEXPRESSES_WITH` can return 100K+ rows
 - Rice species string is `"Oryza sativa"` (13K loci) or `"Oryza sativa subsp. japonica"` (22K loci) -- check both
+- Confusing `/api/` vs `/api/v1/` path prefixes. `/api/` endpoints require JWT auth; `/api/v1/` endpoints (graph query, search, paper evidence) mostly work without auth
+- Expecting enrichment for non-Arabidopsis genes. The enrichment API works best with Arabidopsis IDs; non-Ath enrichment support varies by source
+- Not filtering `ANNOTATED_WITH` by evidence code. Without filtering, IEA (Inferred from Electronic Annotation) floods results with low-confidence annotations
+- Querying `COEXPRESSES_WITH` without score filter. With 3.8M edges, always add `WHERE r.correlation_score > 0.7` or similar threshold
+- Assuming `ORTHOLOGOUS_TO` is Arabidopsis-anchored. Edge direction is an implementation detail, not a biological statement. Always use undirected match for cross-species lookups
+- `Publication.research_concepts` type inconsistency. This property may be a string or a list depending on the publication. Always handle both: `CASE WHEN research_concepts IS :: LIST THEN ... ELSE ... END`
+
+---
+
+## R Integration (httr/jsonlite)
+
+```r
+library(httr)
+library(jsonlite)
+
+# Authenticate and get JWT token
+plantgraph_login <- function(username, password) {
+  resp <- POST(
+    "https://plantgraph.se/api/auth/login",
+    body = list(username = username, password = password),
+    encode = "json",
+    content_type_json()
+  )
+  content(resp, as = "parsed")$access_token
+}
+
+# Raw Cypher query (no auth, uses /api/v1/)
+plantgraph_query <- function(cypher, token = NULL) {
+  if (is.null(token)) {
+    url <- "https://plantgraph.se/api/v1/graph/query"
+    resp <- POST(url, body = list(query = cypher), encode = "json", content_type_json())
+  } else {
+    url <- "https://plantgraph.se/api/graph/query"
+    resp <- POST(url, body = list(query = cypher), encode = "json",
+                 content_type_json(), add_headers(Authorization = paste("Bearer", token)))
+  }
+  content(resp, as = "parsed", simplifyVector = TRUE)$results
+}
+
+# Gene lookup via REST API (requires token)
+plantgraph_gene <- function(gene_id, token) {
+  resp <- GET(
+    paste0("https://plantgraph.se/api/graph/gene/", gene_id),
+    add_headers(Authorization = paste("Bearer", token))
+  )
+  content(resp, as = "parsed", simplifyVector = TRUE)
+}
+
+# Single-gene enrichment (requires token)
+plantgraph_enrich <- function(gene_id, sources = NULL, token) {
+  url <- paste0("https://plantgraph.se/api/enrichment/gene/", gene_id)
+  if (!is.null(sources)) url <- paste0(url, "?sources=", paste(sources, collapse = ","))
+  resp <- GET(url, add_headers(Authorization = paste("Bearer", token)))
+  content(resp, as = "parsed", simplifyVector = TRUE)
+}
+
+# GO enrichment analysis (requires token)
+plantgraph_go_enrichment <- function(gene_ids, p_threshold = 0.05, token) {
+  resp <- POST(
+    "https://plantgraph.se/api/enrichment/analysis/go",
+    body = list(gene_ids = gene_ids, categories = list("biological_process"),
+                p_threshold = p_threshold, correction = "benjamini_hochberg"),
+    encode = "json",
+    content_type_json(),
+    add_headers(Authorization = paste("Bearer", token))
+  )
+  content(resp, as = "parsed", simplifyVector = TRUE)
+}
+
+# Example: get GO terms for a Brachypodium gene (no auth)
+plantgraph_query('
+  MATCH (l:Locus {id: "BRADI_1g16610v3"})-[:ANNOTATED_WITH]->(go:GO)
+  RETURN go.id, go.name
+')
+
+# Example: authenticated enrichment
+# token <- plantgraph_login("user", "pass")
+# plantgraph_enrich("AT2G40150", sources = c("uniprot", "string"), token = token)
+```
+
+---
+
+## Python Integration (requests)
+
+```python
+import requests
+
+BASE_URL = "https://plantgraph.se"
+
+def plantgraph_login(username: str, password: str) -> str:
+    """Authenticate and return JWT token."""
+    resp = requests.post(
+        f"{BASE_URL}/api/auth/login",
+        json={"username": username, "password": password}
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
+
+
+def plantgraph_query(cypher: str, token: str | None = None) -> list:
+    """Run raw Cypher query. Uses /api/v1/ (no auth) if token is None."""
+    if token is None:
+        url = f"{BASE_URL}/api/v1/graph/query"
+        headers = {"Content-Type": "application/json"}
+    else:
+        url = f"{BASE_URL}/api/graph/query"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
+    resp = requests.post(url, json={"query": cypher}, headers=headers)
+    resp.raise_for_status()
+    return resp.json().get("results", [])
+
+
+def plantgraph_gene(gene_id: str, token: str) -> dict:
+    """Get gene details via REST API."""
+    resp = requests.get(
+        f"{BASE_URL}/api/graph/gene/{gene_id}",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def plantgraph_enrich(gene_id: str, token: str, sources: list[str] | None = None) -> dict:
+    """Enrich a gene from external sources."""
+    url = f"{BASE_URL}/api/enrichment/gene/{gene_id}"
+    if sources:
+        url += f"?sources={','.join(sources)}"
+    resp = requests.get(url, headers={"Authorization": f"Bearer {token}"})
+    resp.raise_for_status()
+    return resp.json()
+
+
+def plantgraph_go_enrichment(
+    gene_ids: list[str], token: str, p_threshold: float = 0.05
+) -> dict:
+    """Run GO enrichment analysis on a gene list."""
+    resp = requests.post(
+        f"{BASE_URL}/api/enrichment/analysis/go",
+        json={
+            "gene_ids": gene_ids,
+            "categories": ["biological_process"],
+            "p_threshold": p_threshold,
+            "correction": "benjamini_hochberg",
+        },
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+# Example: query without auth
+results = plantgraph_query('''
+    MATCH (l:Locus {name: "AT2G40150"})-[:ANNOTATED_WITH]->(go:GO)
+    RETURN go.id, go.name
+''')
+
+# Example: authenticated workflow
+# token = plantgraph_login("user", "pass")
+# gene = plantgraph_gene("AT2G40150", token)
+# enrichment = plantgraph_enrich("AT2G40150", token, sources=["uniprot", "string"])
+# go_results = plantgraph_go_enrichment(["AT2G40150", "AT1G01430", "AT5G06700"], token)
+```
