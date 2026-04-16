@@ -7,7 +7,7 @@ description: >-
   poplar, and 120+ other plant species (14.5M+ nodes, 47.9M+ relationships). Also covers:
   real-time enrichment from 42 sources (UniProt, STRING, AlphaFold, KEGG, InterPro, Expression Atlas),
   AI-powered question generation and hypothesis generation, GNN function predictions, paper evidence
-  verification, and natural language graph queries. Use when user mentions PlantGraph, or needs
+  verification, chat, and natural language graph queries. Use when user mentions PlantGraph, or needs
   cross-species gene annotation, protein interactions, pathway enrichment, or literature evidence
   via a plant biology knowledge graph.
 ---
@@ -96,6 +96,7 @@ Exceeding returns `429 Too Many Requests`.
 | `/api/chat/message` | POST | JWT | Chat with sources |
 | `/api/chat/sessions` | POST/GET | JWT | Session management |
 | `/api/chat/sessions/{id}/history` | GET | JWT | Conversation history |
+| `/api/chat/sessions/{id}` | DELETE | JWT | Delete session |
 | `/api/ai/query` | POST | JWT | NL question -> Cypher -> results + confidence |
 | `/api/ai/hypothesis` | POST | JWT | Hypothesis generation |
 | `/api/gnn/predict/{gene_id}` | GET | JWT | GNN function predictions |
@@ -444,58 +445,58 @@ curl -s https://plantgraph.se/api/enrichment/gene/AT2G40150/uniprot \
 ### 42 Enrichment Sources
 
 **Protein & Structure (7):**
-- `uniprot` — UniProt protein features, function, subcellular location
-- `alphafold` — AlphaFold predicted 3D structure + pLDDT scores
-- `interpro` — InterPro domain/family classification
-- `pfam` — Pfam protein family domains
-- `prosite` — PROSITE patterns and profiles
-- `pdb` — Experimental protein structures from RCSB PDB
-- `swiss_model` — SWISS-MODEL homology models
+- `uniprot` — protein function, PTMs, sequence, cross-refs
+- `alphafold` — 3D structure, pLDDT confidence, model URLs
+- `interpro` — domain architecture, functional sites
+- `panther` — protein family/subfamily, cross-species orthologs
+- `pdbe` — experimental structures (X-ray, NMR, cryo-EM)
+- `rcsb_pdb` — structure data with quality metrics
+- `ebi_proteins` — sequence features, variants, PTMs
 
 **Interactions (3):**
-- `string` — STRING protein-protein interaction network + scores
-- `biogrid` — BioGRID experimental interactions
-- `intact` — IntAct molecular interaction data
+- `string` — PPI with confidence scores (`score_threshold` param, default 0.4), evidence breakdown
+- `intact` — experimentally validated interactions with methods
+- `biogrid` — physical and genetic interactions
 
 **Pathways (3):**
-- `kegg` — KEGG pathway maps and enzyme assignments
-- `reactome` — Reactome pathway membership
-- `plantcyc` — PlantCyc/PMN metabolic pathways
+- `kegg` — pathways, modules, reactions (500+ Arabidopsis pathways)
+- `reactome` — expert-curated with reaction mechanisms
+- `wikipathways` — community-curated, 200+ plant species
 
 **Expression (3):**
-- `expression_atlas` — EBI Expression Atlas experiments
-- `genevestigator` — Genevestigator expression compendium
-- `bar_efp` — BAR eFP Browser expression patterns
+- `expression_atlas` — baseline/differential across 3000+ experiments (`experiment_type` param)
+- `bar_efp` — tissue-specific expression visualization
+- `atted2` — co-expression networks with correlation scores
 
 **Ontology (3):**
-- `go` — Gene Ontology annotations (BP, MF, CC)
-- `po` — Plant Ontology annotations
-- `to` — Trait Ontology annotations
+- `quickgo` — GO terms with evidence codes and hierarchy
+- `chebi` — chemical structures, SMILES/InChI, biological roles
+- `ols` — 200+ EBI ontologies
 
 **Literature (3):**
-- `pubmed` — PubMed publication links
-- `europe_pmc` — Europe PMC full-text mining
-- `preprints` — bioRxiv/medRxiv preprint mentions
+- `europepmc` — publications, 40M+ articles (`sort`: relevance/date/citations)
+- `semantic_scholar` — academic metadata, AI analysis, 200M+ papers
+- `crossref` — bibliographic data, citation counts, 130M+ DOIs
 
 **Comparative (4):**
-- `ensembl_plants` — Ensembl Plants orthologues and gene trees
-- `plaza` — PLAZA comparative genomics
-- `phytozome` — Phytozome gene family data
-- `orthodb` — OrthoDB orthologous groups
+- `ensembl` — orthologs, paralogs, gene trees (7 plant species)
+- `oma` — orthology across 2100+ genomes
+- `gramene` — cross-species mappings, 66 plant species
+- `plaza` — gene families, synteny, 50+ plant genomes
 
 **Plant-specific (6):**
-- `tair` — TAIR Arabidopsis annotations
-- `rapdb` — RAP-DB rice annotations
-- `gramene` — Gramene plant comparative resources
-- `planttfdb` — PlantTFDB transcription factor classification
-- `plantreactome` — Plant Reactome pathways
-- `epigenome` — Plant epigenome marks and modifications
+- `planttfdb` — TF classification, DNA-binding domains (2000+ Ath TFs)
+- `suba` — subcellular localization consensus + experimental evidence
+- `aranet` — co-functional network (22K+ Ath genes)
+- `arapheno` — phenotypic variation, QTL data, 1135 accessions
+- `thalemine` — integrated gene info
+- `1001genomes` — SNPs/indels across 1135 accessions
 
 **Other (4):**
-- `pubchem` — PubChem compound links
-- `chembl` — ChEMBL bioactivity data
-- `brenda` — BRENDA enzyme kinetics
-- `phosphat` — PhosPhAt phosphoproteomics
+- `rnacentral` — non-coding RNA (20M+ sequences)
+- `pubchem` — molecular data, 100M+ compounds
+- `wikidata` — linked data, gene-disease associations
+- `mygene` — gene annotation aggregation
 
 ### Batch enrichment
 ```bash
@@ -807,76 +808,84 @@ curl -s -X POST https://plantgraph.se/api/v1/paper-evidence/verify-claims-pdf \
 
 **Top 20 by count:**
 
-| Relationship | Count |
-|---|---|
-| `HAS_METHYLATION` | 2.9M |
-| `EXPRESSED_IN` | 7.3M |
-| `COEXPRESSES_WITH` | 3.8M |
-| `ANNOTATED_WITH` | 2.1M |
-| `ORTHOLOGOUS_TO` | 1.8M |
-| `HAS_DOMAIN` | 1.2M |
-| `INTERACTS_WITH` | 890K |
-| `HAS_SNP` | 1.3M |
-| `MENTIONED_IN` | 1.1M |
-| `HAS_PHOSPHORYLATION_SITE` | 190K |
-| `HAS_HISTONE_MARK` | 154K |
-| `MEMBER_OF_GENE_FAMILY` | 420K |
-| `BELONGS_TO_PATHWAY` | 310K |
-| `COFUNCTIONAL_WITH` | 280K |
-| `HAS_INTERPRO_DOMAIN` | 250K |
-| `EXPRESSED_IN_TISSUE` | 220K |
-| `DAPSEQ_BINDS_PROMOTER` | 180K |
-| `PARALOGOUS_TO` | 160K |
-| `EXPRESSED_UNDER_STRESS` | 140K |
-| `PUBLISHED_IN` | 130K |
+| Relationship | Count | Notes |
+|---|---|---|
+| `EXPRESSED_IN_CELL_TYPE` | 22.1M | Single-cell expression |
+| `ORTHOLOGOUS_TO` | 18.0M | Cross-species, use undirected match |
+| `ANNOTATED_WITH` | 14.2M | GO terms, filter by evidence code |
+| `INTERACTS_WITH` | 8.2M | PPI |
+| `HAS_PROFILE` | 7.7M | Expression profiles |
+| `EXPRESSED_IN` | 7.4M | Tissue/organ expression |
+| `BINDS_TO` | 5.4M | TF binding |
+| `REGULATES` | 4.4M | Regulatory edges |
+| `COEXPRESSES_WITH` | 3.8M | Filter by correlation_score |
+| `DAPSEQ_BINDS_PROMOTER` | 3.4M | Gold-standard TF binding |
+| `HAS_METHYLATION` | 2.9M | DNA methylation |
+| `PARTICIPATES_IN` | 2.7M | Pathway membership |
+| `HAS_MESH_TERM` | 2.6M | Publication MeSH |
+| `COFUNCTIONAL_WITH` | 2.6M | AraNet |
+| `BINDS_PROMOTER` | 2.4M | Promoter binding |
+| `METHYLATED_IN_CONTEXT` | 1.6M | CpG/CHG/CHH context |
+| `ANNOTATED_WITH_PO` | 1.6M | Plant Ontology |
+| `HAS_MAPMAN_BIN` | 1.6M | MapMan functional bins |
+| `HAS_DOMAIN` | 1.5M | Protein domains |
+| `IN_TAXON` | 1.5M | Taxonomic assignment |
+
+**LIMIT aggressively** on high-count relationships. `INTERACTS_WITH` and `COEXPRESSES_WITH` can return 100K+ rows for well-connected genes.
 
 **Full list by category:**
 
-**Gene-gene:** `INTERACTS_WITH`, `COEXPRESSES_WITH`, `COFUNCTIONAL_WITH`, `ORTHOLOGOUS_TO`, `PARALOGOUS_TO`, `HOMOLOGOUS_TO`, `SYNTENIC_WITH`
+**Core biology:** `INTERACTS_WITH`, `COEXPRESSES_WITH`, `COFUNCTIONAL_WITH`, `ORTHOLOGOUS_TO`, `PARALOGOUS_TO`
 
-**Regulation:** `REGULATES`, `ACTIVATES`, `REPRESSES`, `TARGETS`, `BINDS_TO`, `BINDS_PROMOTER`, `DAPSEQ_BINDS_PROMOTER`, `BINDS_ENHANCER`, `BINDS_MOTIF`
+**Annotation:** `ANNOTATED_WITH`, `ANNOTATED_WITH_PO`, `NCBI_ANNOTATED_WITH`, `HAS_DOMAIN`, `HAS_INTERPRO_DOMAIN`, `HAS_PROTEIN_DOMAIN`, `HAS_MAPMAN_BIN`, `DOMAIN_GO_ANNOTATION`
 
-**Annotation:** `ANNOTATED_WITH`, `ANNOTATED_WITH_PO`, `ANNOTATED_WITH_TO`, `HAS_DOMAIN`, `HAS_INTERPRO_DOMAIN`, `HAS_MAPMAN_BIN`, `HAS_KEGG_ORTHOLOGY`, `NCBI_ANNOTATED_WITH`
+**Regulation:** `ACTIVATES`, `REPRESSES`, `REGULATES`, `BINDS_TO`, `BINDS_PROMOTER`, `DAPSEQ_BINDS_PROMOTER`, `TARGETS`, `HAS_BINDING_MOTIF`, `HAS_BINDING_SITE`, `HAS_MOTIF`, `HAS_JASPAR_MOTIF`, `HAS_REPRESENTATIVE_MOTIF`, `BINDS_AT`
 
-**Membership:** `MEMBER_OF`, `MEMBER_OF_TF_FAMILY`, `MEMBER_OF_GENE_FAMILY`, `MEMBER_OF_COMPLEX`, `PART_OF_COMPLEX`, `PARTICIPATES_IN`, `BELONGS_TO_PATHWAY`, `PART_OF_PATHWAY`
+**Membership:** `MEMBER_OF`, `MEMBER_OF_TF_FAMILY`, `MEMBER_OF_GENE_FAMILY`, `MEMBER_OF_COMPLEX`, `MEMBER_OF_CLUSTER`, `PART_OF_COMPLEX`, `PART_OF_CLUSTER`, `PARTICIPATES_IN`, `BELONGS_TO_PATHWAY`, `HAS_SUBPATHWAY`, `IN_CLUSTER`, `PARENT_BIN`
 
-**Expression:** `EXPRESSED_IN`, `EXPRESSED_IN_TISSUE`, `EXPRESSED_IN_CELL_TYPE`, `EXPRESSED_UNDER_STRESS`, `EXPRESSED_IN_SPATIAL_REGION`, `EXPRESSED_IN_SPATIAL_ZONE`, `HAS_EXPRESSION_PROFILE`, `HAS_DIURNAL_PROFILE`
+**Expression:** `EXPRESSED_IN`, `EXPRESSED_IN_TISSUE`, `EXPRESSED_IN_CELL_TYPE`, `EXPRESSED_IN_REGION`, `EXPRESSED_IN_ZONE`, `EXPRESSED_UNDER_STRESS`, `EXPRESSED_UNDER_CONDITION`, `EXPRESSED_AT_TIMEPOINT`, `HAS_PROFILE`, `HAS_DIURNAL_PROFILE`, `HAS_RHYTHMIC_MEMBERS`, `REPRESENTS_STAGE`
 
-**Responses:** `RESPONDS_TO_HORMONE`, `RESPONDS_TO_NUTRIENT`, `RESPONDS_TO_PATHOGEN`, `RESPONDS_TO_STRESS`, `RESPONDS_TO_LIGHT`
+**Spatial:** `LOCATED_IN_SPATIAL_REGION`, `HAS_SPATIAL_LOCATION`, `LOCATED_IN`, `LOCALIZED_TO`, `LOCALIZES_TO`
 
-**Life history:** `INVOLVED_IN_FLOWERING`, `CITED_IN_FLOWERING`, `INVOLVED_IN_ADAPTATION`, `ASSOCIATED_WITH_TRAIT`
+**Responses:** `RESPONDS_TO_HORMONE`, `RESPONDS_TO_NUTRIENT`, `RESPONDS_TO_PATHOGEN`, `AFFECTED_BY_CONDITION`, `UNDER_CONDITION`, `HAS_CONDITION`
 
-**Epigenetics:** `HAS_HISTONE_MARK`, `HAS_METHYLATION`, `HAS_CHROMATIN_STATE`
+**Life history:** `INVOLVED_IN_FLOWERING`, `CITED_IN_FLOWERING`, `INVOLVED_IN_ADAPTATION`, `INVOLVED_IN_SYMBIOSIS`
 
-**PTMs:** `HAS_PHOSPHORYLATION_SITE`, `HAS_UBIQUITINATION_SITE`, `HAS_ACETYLATION_SITE`, `HAS_SUMOYLATION_SITE`, `HAS_SNITROSYLATION_SITE`, `HAS_SULFENYLATION_SITE`, `HAS_GLCNACYLATION_SITE`, `HAS_METHYLATION_SITE`
+**GWAS/traits:** `ASSOCIATED_WITH_TRAIT`, `ASSOCIATED_WITH`, `IS_A_TRAIT`, `MEASURES_TRAIT`, `GWAS_OF`, `HAS_PHENOTYPE`
 
-**Protein:** `MAPS_TO`, `HAS_STRUCTURE`, `HAS_FEATURE`, `HAS_LIGAND`, `BINDS_LIGAND`, `ENCODES_ENZYME`, `CATALYZES`, `CATALYZES_REACTION`
+**Epigenetics:** `HAS_HISTONE_MARK`, `HAS_METHYLATION`, `METHYLATED_IN_CONTEXT`, `HAS_METHYLATION_SITE`, `HAS_DHS_REGION`, `IN_ACCESSIBLE_REGION`
 
-**Variants:** `HAS_SNP`, `HAS_INDEL`, `ASSOCIATED_WITH_GWAS`, `ASSOCIATED_WITH_TRAIT`
+**PTMs:** `HAS_PHOSPHORYLATION_SITE`, `HAS_PHOSPHOSITE`, `HAS_UBIQUITINATION_SITE`, `HAS_ACETYLATION_SITE`, `HAS_SUMOYLATION_SITE`, `HAS_SNITROSYLATION_SITE`, `HAS_SULFENYLATION_SITE`, `HAS_GLCNACYLATION_SITE`, `HAS_MYRISTOYLATION`, `HAS_PTM_SITE`
 
-**Literature:** `PUBLISHED_IN`, `MENTIONED_IN`, `CITED_IN_FLOWERING`, `AUTHORED_BY`, `HAS_MESH`
+**Protein:** `MAPS_TO`, `ENCODES`, `HAS_FEATURE`, `HAS_STRUCTURE`, `BINDS_LIGAND`, `HAS_LIGAND_BINDING`, `HAS_MS_EVIDENCE`, `HAS_PROTEOMICS_EVIDENCE`, `TRANSLATED_FROM`, `EXPRESSED_AS`, `HAS_TRANSCRIPT`, `ENCODES_ENZYME`, `ENCODES_LNCRNA`, `ENCODES_SORF`, `HAS_SMALL_ORF`
 
-**Taxonomy:** `BELONGS_TO_SPECIES`, `HAS_TAXON`, `IN_GENE_FAMILY`, `IN_PROTEIN_FAMILY`
+**Pathogen:** `HAS_PATHOGEN`, `TARGETS_HOST_PROTEIN`, `VIRULENCE_GENE_OF`, `HAS_HOST`, `FOUND_IN_ORGANISM`, `INVOLVES_GENE`
 
-**Pathogen:** `INTERACTS_WITH_PATHOGEN`, `TARGETED_BY_EFFECTOR`, `PHI_INTERACTION`
+**Metabolism:** `CATALYZES`, `CATALYZES_REACTION`, `HAS_REACTION`, `CONSUMES`, `PRODUCES`, `METABOLITE_IN`
+
+**Literature:** `PUBLISHED_IN`, `MENTIONED_IN`, `CITED_BY`, `CITES`, `CITED_IN_FLOWERING`, `HAS_AUTHOR`, `COAUTHORED_WITH`, `HAS_MESH_TERM`, `LATER_PUBLISHED_AS`, `WORKS_ON_GENE`
+
+**Variant:** `HAS_VARIANT`, `NEAR_VARIANT`, `OVERLAPS_WITH`
+
+**Cross-reference:** `SAME_AS`, `DERIVED_FROM`, `DERIVES_FROM`, `CONNECTED_TO_GRAPH`, `HAS_TAIR_LOCUS`, `HAS_TAIR_OBJECT`, `ONTOLOGY_ANCHOR`, `FROM_DATABASE`, `SUPPORTED_BY`, `DETECTED_BY`, `MARKER_OF`, `MEASURED`, `MEASURED_IN`, `MEASURED_UNDER`, `OBSERVED_IN`, `HAS_EXPERIMENT`, `PART_OF_EXPERIMENT`, `HAS_SAMPLE`, `HAS_PECO_TERM`, `HAS_TO_TERM`, `IN_TAXON`, `PARENT_OF`, `IS_A`
 
 ### Relationship Properties
 
-| Relationship | Properties |
-|---|---|
-| `INTERACTS_WITH` | `source`, `score`, `experimental_system`, `detection_method`, `pubmed_id` |
-| `COEXPRESSES_WITH` | `correlation_score`, `mutual_rank`, `source`, `tissue`, `condition` |
-| `ANNOTATED_WITH` | `evidence_code`, `source`, `date`, `qualifier`, `aspect` |
-| `ORTHOLOGOUS_TO` | `method`, `score`, `source`, `identity_percent` |
-| `EXPRESSED_UNDER_STRESS` | `stress_type`, `log2fc`, `padj`, `timepoint`, `tissue`, `experiment_id` |
-| `DAPSEQ_BINDS_PROMOTER` | `peak_score`, `distance_to_tss`, `motif`, `source` |
-| `NCBI_ANNOTATED_WITH` | `evidence_code`, `source`, `date` |
+| Relationship | Properties | Notes |
+|---|---|---|
+| `INTERACTS_WITH` | `pubmed_ids`, `methods`, `source`, `evidence_codes` | Filter by source or evidence |
+| `COEXPRESSES_WITH` | `correlation_score`, `rank`, `dataset_source`, `source_entrez_id`, `target_entrez_id` | Always has score/rank. Optional: `atted2_v13_lls`, `atted2_v13_rank` |
+| `ANNOTATED_WITH` | `source`, `evidence` | GO evidence codes: IDA, IMP, IGI, IPI, IEP (experimental), IEA (computational) |
+| `ORTHOLOGOUS_TO` | `source` | No score or confidence — just source DB |
+| `EXPRESSED_UNDER_STRESS` | `log2fc` | Indexed — fast range queries |
+| `DAPSEQ_BINDS_PROMOTER` | `source` | Indexed |
+| `NCBI_ANNOTATED_WITH` | `evidence_code` | Indexed |
 
-**Filter GO by evidence code:**
+**Filter GO to experimental evidence only:**
 ```cypher
 MATCH (l:Locus {name: "AT2G40150"})-[r:ANNOTATED_WITH]->(go:GO)
-WHERE r.evidence_code IN ["EXP", "IDA", "IPI", "IMP", "IGI", "IEP"]
-RETURN go.id, go.name, r.evidence_code
+WHERE r.evidence IN ["IDA", "IMP", "IGI", "IPI", "IEP"]
+RETURN go.id, go.name, r.evidence
 ```
 
 **Filter co-expression by score:**
@@ -890,30 +899,30 @@ ORDER BY r.correlation_score DESC LIMIT 20
 **Filter stress expression by log2fc:**
 ```cypher
 MATCH (l:Locus {name: "AT2G40150"})-[r:EXPRESSED_UNDER_STRESS]->(s)
-WHERE abs(r.log2fc) > 2
-RETURN s.name AS stress, r.log2fc, r.padj, r.timepoint
-ORDER BY abs(r.log2fc) DESC
+WHERE r.log2fc > 1
+RETURN s.name AS stress, r.log2fc
+ORDER BY r.log2fc DESC
 ```
 
 ### Node Properties
 
 **Locus (Arabidopsis):**
-`name` (AT-format), `id`, `symbol`, `description`, `species`, `chromosome`, `start`, `end`, `strand`, `gene_model_type`, `aranet_enriched` (boolean), `ensembl_homolog_count`, `atgen_drought_*`/`atgen_salt_*`/`atgen_cold_*` (ATGenExpress stress TPMs), `circ_emexp1304_*` (circadian expression), `geod*_lfc` (GEO log fold-changes)
+`id`, `name` (AT ID), `symbol`, `species`, `taxon_id`, `chromosome`, `start`, `end`, `strand`, `description`, `gene_type`, `is_tf` (boolean), `tf_family`, `is_arabidopsis` (true), `ncbi_gene_id`, `entrez_id`, `uniprot_id`, `pfam_ids` (array), `subcellular_location`, `peptideatlas_detected`, `ensembl_homolog_count`, `aranet_enriched`, `remap_peak_count`, `remap_tf_count`. Plus hundreds of embedded expression properties: `atgen_drought_*`, `atgen_salt_*`, `atgen_cold_*` (ATGenExpress TPMs), `circ_emexp1304_*` (circadian), `geod*_tpm`/`geod*_lfc` (GEO datasets), `mtab*_tpm` (ArrayExpress).
 
 **Locus (non-Arabidopsis):**
-`id` (species-specific format), `species`, `description`, `chromosome`, `start`, `end`, `strand`. Also carries expression properties (e.g., `bradi_mtab4401_leaf_tpm`). `name` is null — always use `id` for lookups.
+`id`, `species`, `taxon_id`, `description`, `description_source`, `source`, `is_arabidopsis` (false), `ortholog_ref_id`. Expression properties are species-prefixed: `bradi_mtab4401_*_tpm`, `bradi_mean_tpm`, `bradi_max_tpm`, etc. `name` is null — always use `id` for lookups.
 
 **GO:**
-`id` (GO:0000001 format), `name`, `definition`, `namespace` (biological_process, molecular_function, cellular_component)
+`id`, `name`, `name_obo`, `namespace` (molecular_function/biological_process/cellular_component), `definition`, `synonyms` (array), `is_obsolete` (boolean), `enriched` (boolean)
 
 **Publication:**
-`pmid`, `title`, `abstract`, `year`, `journal`, `doi`, `research_concepts`. **Warning:** `research_concepts` type is inconsistent — may be a string or a list depending on the publication. Always handle both types.
+`pubmed_id`, `title`, `abstract`, `authors`, `year`, `journal`, `doi`, `pmc_id`, `citation_count`, `cited_by_count`, `is_open_access`, `full_text_mined`, `gene_count`. **Warning:** `research_concepts` has inconsistent type — sometimes `List[str]`, sometimes semicolon-delimited `string`. Handle both.
 
 **Species:**
-`name`, `common_name`, `taxonomy_id`, `locus_count`
+`id` (snake_case), `name`, `common_name`, `taxon_id`, `source`
 
 **Pathway:**
-`id`, `name`, `source` (KEGG, Reactome, PlantCyc, PMN), `description`, `species`
+`id`, `name`, `kegg_name`, `kegg_category`, `kegg_organism`, `kegg_gene_count`, `kegg_compound_count`, `url`
 
 ### Fulltext Indexes (7)
 
@@ -922,10 +931,10 @@ ORDER BY abs(r.log2fc) DESC
 | `gene_fulltext` | Locus | symbol, name, description |
 | `go_fulltext` | GO | name, definition |
 | `publication_fulltext` | Publication | title, abstract |
-| `pathway_fulltext` | Pathway | name, description |
-| `compound_fulltext` | MetabolicCompound | name, formula |
-| `enzyme_fulltext` | Enzyme | name, ec_number |
-| `reaction_fulltext` | Reaction | name, equation |
+| `pathway_fulltext` | Pathway | name, common_name |
+| `compound_fulltext` | MetabolicCompound | name, common_name |
+| `enzyme_fulltext` | Enzyme | common_name, id |
+| `reaction_fulltext` | Reaction | common_name, id |
 
 **Example:**
 ```cypher
