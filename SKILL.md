@@ -633,7 +633,7 @@ curl -s -X POST https://plantgraph.se/api/v1/paper-evidence/verify-claims-pdf -F
 | Relationship | Properties | Notes |
 |---|---|---|
 | `INTERACTS_WITH` | `pubmed_ids`, `methods`, `source`, `evidence_codes` | Filter by source or evidence |
-| `COEXPRESSES_WITH` | `correlation_score`, `rank`, `dataset_source`, `source_entrez_id`, `target_entrez_id` | Always has score/rank. Optional: `atted2_v13_lls`/`rank` |
+| `COEXPRESSES_WITH` | `correlation_score`, `rank`, `dataset_source`, `source_entrez_id`, `target_entrez_id` | Always has score/rank. Optional: `atted2_v13_lls`, `atted2_v13_rank` |
 | `ANNOTATED_WITH` | `source`, `evidence` | Evidence: IDA, IMP, IGI, IPI, IEP (experimental), IEA (computational) |
 | `ORTHOLOGOUS_TO` | `source` | Source DB only, no score |
 | `EXPRESSED_UNDER_STRESS` | `log2fc` | Indexed — fast range queries |
@@ -773,7 +773,7 @@ LIMIT 50
 | Juglans regia | 40K | Sorghum bicolor | 16K |
 | Brassica rapa | 39K | Brachypodium distachyon | 15K |
 
-Also: 9 Oryza spp, conifers (Picea abies), mosses (Physcomitrium patens), ferns (Selaginella moellendorffii), algae, liverworts, hornworts.
+Also: 9 Oryza spp, conifers (Picea abies), mosses (Physcomitrium patens), ferns (Selaginella moellendorffii), algae (Galdieria sulphuraria, Chara braunii), liverworts (Marchantia polymorpha), hornworts (Anthoceros angustus).
 
 **Not in graph:** Hordeum vulgare, B. sylvaticum. Use orthologue chains via Bdis or Ath.
 
